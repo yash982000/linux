@@ -31,7 +31,6 @@
 #include <asm/apic.h>
 #endif
 
-#define ACPI_PROCESSOR_CLASS            "processor"
 #define _COMPONENT              ACPI_PROCESSOR_COMPONENT
 ACPI_MODULE_NAME("processor_idle");
 
@@ -176,6 +175,7 @@ static void lapic_timer_propagate_broadcast(struct acpi_processor *pr) { }
 static bool lapic_timer_needs_broadcast(struct acpi_processor *pr,
 					struct acpi_processor_cx *cx)
 {
+	return false;
 }
 
 #endif

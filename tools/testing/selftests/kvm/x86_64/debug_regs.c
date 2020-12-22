@@ -73,7 +73,7 @@ int main(void)
 	int i;
 	/* Instruction lengths starting at ss_start */
 	int ss_size[4] = {
-		3,		/* xor */
+		2,		/* xor */
 		2,		/* cpuid */
 		5,		/* mov */
 		2,		/* rdmsr */
@@ -85,7 +85,6 @@ int main(void)
 	}
 
 	vm = vm_create_default(VCPU_ID, 0, guest_code);
-	vcpu_set_cpuid(vm, VCPU_ID, kvm_get_supported_cpuid());
 	run = vcpu_state(vm, VCPU_ID);
 
 	/* Test software BPs - int3 */

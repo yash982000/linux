@@ -6,6 +6,7 @@
  *
  */
 
+#include <linux/ethtool.h>
 #include <linux/types.h>
 #include <linux/slab.h>
 #include <linux/kernel.h>
@@ -777,9 +778,11 @@ static const struct nla_policy taprio_policy[TCA_TAPRIO_ATTR_MAX + 1] = {
 	[TCA_TAPRIO_ATTR_TXTIME_DELAY]		     = { .type = NLA_U32 },
 };
 
-static int fill_sched_entry(struct nlattr **tb, struct sched_entry *entry,
+static int fill_sched_entry(struct taprio_sched *q, struct nlattr **tb,
+			    struct sched_entry *entry,
 			    struct netlink_ext_ack *extack)
 {
+	int min_duration = length_to_duration(q, ETH_ZLEN);
 	u32 interval = 0;
 
 	if (tb[TCA_TAPRIO_SCHED_ENTRY_CMD])
@@ -794,7 +797,10 @@ static int fill_sched_entry(struct nlattr **tb, struct sched_entry *entry,
 		interval = nla_get_u32(
 			tb[TCA_TAPRIO_SCHED_ENTRY_INTERVAL]);
 
-	if (interval == 0) {
+	/* The interval should allow at least the minimum ethernet
+	 * frame to go out.
+	 */
+	if (interval < min_duration) {
 		NL_SET_ERR_MSG(extack, "Invalid interval for schedule entry");
 		return -EINVAL;
 	}
@@ -804,8 +810,9 @@ static int fill_sched_entry(struct nlattr **tb, struct sched_entry *entry,
 	return 0;
 }
 
-static int parse_sched_entry(struct nlattr *n, struct sched_entry *entry,
-			     int index, struct netlink_ext_ack *extack)
+static int parse_sched_entry(struct taprio_sched *q, struct nlattr *n,
+			     struct sched_entry *entry, int index,
+			     struct netlink_ext_ack *extack)
 {
 	struct nlattr *tb[TCA_TAPRIO_SCHED_ENTRY_MAX + 1] = { };
 	int err;
@@ -819,10 +826,10 @@ static int parse_sched_entry(struct nlattr *n, struct sched_entry *entry,
 
 	entry->index = index;
 
-	return fill_sched_entry(tb, entry, extack);
+	return fill_sched_entry(q, tb, entry, extack);
 }
 
-static int parse_sched_list(struct nlattr *list,
+static int parse_sched_list(struct taprio_sched *q, struct nlattr *list,
 			    struct sched_gate_list *sched,
 			    struct netlink_ext_ack *extack)
 {
@@ -847,7 +854,7 @@ static int parse_sched_list(struct nlattr *list,
 			return -ENOMEM;
 		}
 
-		err = parse_sched_entry(n, entry, i, extack);
+		err = parse_sched_entry(q, n, entry, i, extack);
 		if (err < 0) {
 			kfree(entry);
 			return err;
@@ -862,7 +869,7 @@ static int parse_sched_list(struct nlattr *list,
 	return i;
 }
 
-static int parse_taprio_schedule(struct nlattr **tb,
+static int parse_taprio_schedule(struct taprio_sched *q, struct nlattr **tb,
 				 struct sched_gate_list *new,
 				 struct netlink_ext_ack *extack)
 {
@@ -883,8 +890,8 @@ static int parse_taprio_schedule(struct nlattr **tb,
 		new->cycle_time = nla_get_s64(tb[TCA_TAPRIO_ATTR_SCHED_CYCLE_TIME]);
 
 	if (tb[TCA_TAPRIO_ATTR_SCHED_ENTRY_LIST])
-		err = parse_sched_list(
-			tb[TCA_TAPRIO_ATTR_SCHED_ENTRY_LIST], new, extack);
+		err = parse_sched_list(q, tb[TCA_TAPRIO_ATTR_SCHED_ENTRY_LIST],
+				       new, extack);
 	if (err < 0)
 		return err;
 
@@ -1473,7 +1480,7 @@ static int taprio_change(struct Qdisc *sch, struct nlattr *opt,
 		goto free_sched;
 	}
 
-	err = parse_taprio_schedule(tb, new_admin, extack);
+	err = parse_taprio_schedule(q, tb, new_admin, extack);
 	if (err < 0)
 		goto free_sched;
 
@@ -1590,6 +1597,21 @@ free_sched:
 	return err;
 }
 
+static void taprio_reset(struct Qdisc *sch)
+{
+	struct taprio_sched *q = qdisc_priv(sch);
+	struct net_device *dev = qdisc_dev(sch);
+	int i;
+
+	hrtimer_cancel(&q->advance_timer);
+	if (q->qdiscs) {
+		for (i = 0; i < dev->num_tx_queues && q->qdiscs[i]; i++)
+			qdisc_reset(q->qdiscs[i]);
+	}
+	sch->qstats.backlog = 0;
+	sch->q.qlen = 0;
+}
+
 static void taprio_destroy(struct Qdisc *sch)
 {
 	struct taprio_sched *q = qdisc_priv(sch);
@@ -1600,7 +1622,6 @@ static void taprio_destroy(struct Qdisc *sch)
 	list_del(&q->taprio_list);
 	spin_unlock(&taprio_list_lock);
 
-	hrtimer_cancel(&q->advance_timer);
 
 	taprio_disable_offload(dev, q, NULL);
 
@@ -1947,6 +1968,7 @@ static struct Qdisc_ops taprio_qdisc_ops __read_mostly = {
 	.init		= taprio_init,
 	.change		= taprio_change,
 	.destroy	= taprio_destroy,
+	.reset		= taprio_reset,
 	.peek		= taprio_peek,
 	.dequeue	= taprio_dequeue,
 	.enqueue	= taprio_enqueue,

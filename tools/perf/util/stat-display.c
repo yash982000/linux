@@ -324,13 +324,10 @@ static int first_shadow_cpu(struct perf_stat_config *config,
 	struct evlist *evlist = evsel->evlist;
 	int i;
 
-	if (!config->aggr_get_id)
-		return 0;
-
 	if (config->aggr_mode == AGGR_NONE)
 		return id;
 
-	if (config->aggr_mode == AGGR_GLOBAL)
+	if (!config->aggr_get_id)
 		return 0;
 
 	for (i = 0; i < evsel__nr_cpus(evsel); i++) {
@@ -946,7 +943,6 @@ static void print_metric_headers(struct perf_stat_config *config,
 		out.print_metric = print_metric_header;
 		out.new_line = new_line_metric;
 		out.force_header = true;
-		os.evsel = counter;
 		perf_stat__print_shadow_stats(config, counter, 0,
 					      0,
 					      &out,
@@ -1188,12 +1184,8 @@ static void print_percore(struct perf_stat_config *config,
 		fputc('\n', output);
 }
 
-void
-perf_evlist__print_counters(struct evlist *evlist,
-			    struct perf_stat_config *config,
-			    struct target *_target,
-			    struct timespec *ts,
-			    int argc, const char **argv)
+void evlist__print_counters(struct evlist *evlist, struct perf_stat_config *config,
+			    struct target *_target, struct timespec *ts, int argc, const char **argv)
 {
 	bool metric_only = config->metric_only;
 	int interval = config->interval;

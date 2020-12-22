@@ -28,6 +28,10 @@ enum perf_stat_evsel_id {
 	PERF_STAT_EVSEL_ID__TOPDOWN_SLOTS_RETIRED,
 	PERF_STAT_EVSEL_ID__TOPDOWN_FETCH_BUBBLES,
 	PERF_STAT_EVSEL_ID__TOPDOWN_RECOVERY_BUBBLES,
+	PERF_STAT_EVSEL_ID__TOPDOWN_RETIRING,
+	PERF_STAT_EVSEL_ID__TOPDOWN_BAD_SPEC,
+	PERF_STAT_EVSEL_ID__TOPDOWN_FE_BOUND,
+	PERF_STAT_EVSEL_ID__TOPDOWN_BE_BOUND,
 	PERF_STAT_EVSEL_ID__SMI_NUM,
 	PERF_STAT_EVSEL_ID__APERF,
 	PERF_STAT_EVSEL_ID__MAX,
@@ -82,6 +86,10 @@ enum stat_type {
 	STAT_TOPDOWN_SLOTS_RETIRED,
 	STAT_TOPDOWN_FETCH_BUBBLES,
 	STAT_TOPDOWN_RECOVERY_BUBBLES,
+	STAT_TOPDOWN_RETIRING,
+	STAT_TOPDOWN_BAD_SPEC,
+	STAT_TOPDOWN_FE_BOUND,
+	STAT_TOPDOWN_BE_BOUND,
 	STAT_SMI_NUM,
 	STAT_APERF,
 	STAT_MAX
@@ -114,6 +122,7 @@ struct perf_stat_config {
 	bool			 metric_no_group;
 	bool			 metric_no_merge;
 	bool			 stop_read_counter;
+	bool			 quiet;
 	FILE			*output;
 	unsigned int		 interval;
 	unsigned int		 timeout;
@@ -136,6 +145,8 @@ struct perf_stat_config {
 	struct rblist		 metric_events;
 	int			 ctl_fd;
 	int			 ctl_fd_ack;
+	bool			 ctl_fd_close;
+	const char		*cgroup_list;
 };
 
 void perf_stat__set_big_num(int set);
@@ -202,12 +213,12 @@ void perf_stat__print_shadow_stats(struct perf_stat_config *config,
 				   struct runtime_stat *st);
 void perf_stat__collect_metric_expr(struct evlist *);
 
-int perf_evlist__alloc_stats(struct evlist *evlist, bool alloc_raw);
-void perf_evlist__free_stats(struct evlist *evlist);
-void perf_evlist__reset_stats(struct evlist *evlist);
-void perf_evlist__reset_prev_raw_counts(struct evlist *evlist);
-void perf_evlist__copy_prev_raw_counts(struct evlist *evlist);
-void perf_evlist__save_aggr_prev_raw_counts(struct evlist *evlist);
+int evlist__alloc_stats(struct evlist *evlist, bool alloc_raw);
+void evlist__free_stats(struct evlist *evlist);
+void evlist__reset_stats(struct evlist *evlist);
+void evlist__reset_prev_raw_counts(struct evlist *evlist);
+void evlist__copy_prev_raw_counts(struct evlist *evlist);
+void evlist__save_aggr_prev_raw_counts(struct evlist *evlist);
 
 int perf_stat_process_counter(struct perf_stat_config *config,
 			      struct evsel *counter);
@@ -227,12 +238,8 @@ int create_perf_stat_counter(struct evsel *evsel,
 			     struct perf_stat_config *config,
 			     struct target *target,
 			     int cpu);
-void
-perf_evlist__print_counters(struct evlist *evlist,
-			    struct perf_stat_config *config,
-			    struct target *_target,
-			    struct timespec *ts,
-			    int argc, const char **argv);
+void evlist__print_counters(struct evlist *evlist, struct perf_stat_config *config,
+			    struct target *_target, struct timespec *ts, int argc, const char **argv);
 
 struct metric_expr;
 double test_generic_metric(struct metric_expr *mexp, int cpu, struct runtime_stat *st);
