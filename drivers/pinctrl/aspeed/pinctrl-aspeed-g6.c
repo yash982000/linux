@@ -347,7 +347,7 @@ FUNC_GROUP_DECL(RMII4, F24, E23, E24, E25, C25, C24, B26, B25, B24);
 
 #define D22 40
 SIG_EXPR_LIST_DECL_SESG(D22, SD1CLK, SD1, SIG_DESC_SET(SCU414, 8));
-SIG_EXPR_LIST_DECL_SEMG(D22, PWM8, PWM8G0, PWM8, SIG_DESC_SET(SCU414, 8));
+SIG_EXPR_LIST_DECL_SEMG(D22, PWM8, PWM8G0, PWM8, SIG_DESC_SET(SCU4B4, 8));
 PIN_DECL_2(D22, GPIOF0, SD1CLK, PWM8);
 GROUP_DECL(PWM8G0, D22);
 
@@ -2611,8 +2611,8 @@ static struct aspeed_pin_config aspeed_g6_configs[] = {
 };
 
 /**
- * Configure a pin's signal by applying an expression's descriptor state for
- * all descriptors in the expression.
+ * aspeed_g6_sig_expr_set() - Configure a pin's signal by applying an
+ * expression's descriptor state for all descriptors in the expression.
  *
  * @ctx: The pinmux context
  * @expr: The expression associated with the function whose signal is to be

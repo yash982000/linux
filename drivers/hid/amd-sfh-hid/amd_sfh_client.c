@@ -88,6 +88,7 @@ static void amd_sfh_work(struct work_struct *work)
 	sensor_index = req_node->sensor_idx;
 	report_id = req_node->report_id;
 	node_type = req_node->report_type;
+	kfree(req_node);
 
 	if (node_type == HID_FEATURE_REPORT) {
 		report_size = get_feature_report(sensor_index, report_id,
@@ -142,7 +143,7 @@ int amd_sfh_hid_client_init(struct amd_mp2_dev *privdata)
 	int rc, i;
 
 	dev = &privdata->pdev->dev;
-	cl_data = kzalloc(sizeof(*cl_data), GFP_KERNEL);
+	cl_data = devm_kzalloc(dev, sizeof(*cl_data), GFP_KERNEL);
 	if (!cl_data)
 		return -ENOMEM;
 
@@ -154,7 +155,7 @@ int amd_sfh_hid_client_init(struct amd_mp2_dev *privdata)
 
 	for (i = 0; i < cl_data->num_hid_devices; i++) {
 		cl_data->sensor_virt_addr[i] = dma_alloc_coherent(dev, sizeof(int) * 8,
-								  &cl_data->sensor_phys_addr[i],
+								  &cl_data->sensor_dma_addr[i],
 								  GFP_KERNEL);
 		cl_data->sensor_sts[i] = 0;
 		cl_data->sensor_requested_cnt[i] = 0;
@@ -175,21 +176,22 @@ int amd_sfh_hid_client_init(struct amd_mp2_dev *privdata)
 			rc = -EINVAL;
 			goto cleanup;
 		}
-		cl_data->feature_report[i] = kzalloc(feature_report_size, GFP_KERNEL);
+		cl_data->feature_report[i] = devm_kzalloc(dev, feature_report_size, GFP_KERNEL);
 		if (!cl_data->feature_report[i]) {
 			rc = -ENOMEM;
 			goto cleanup;
 		}
-		cl_data->input_report[i] = kzalloc(input_report_size, GFP_KERNEL);
+		cl_data->input_report[i] = devm_kzalloc(dev, input_report_size, GFP_KERNEL);
 		if (!cl_data->input_report[i]) {
 			rc = -ENOMEM;
 			goto cleanup;
 		}
 		info.period = msecs_to_jiffies(AMD_SFH_IDLE_LOOP);
 		info.sensor_idx = cl_idx;
-		info.phys_address = cl_data->sensor_phys_addr[i];
+		info.dma_address = cl_data->sensor_dma_addr[i];
 
-		cl_data->report_descr[i] = kzalloc(cl_data->report_descr_sz[i], GFP_KERNEL);
+		cl_data->report_descr[i] =
+			devm_kzalloc(dev, cl_data->report_descr_sz[i], GFP_KERNEL);
 		if (!cl_data->report_descr[i]) {
 			rc = -ENOMEM;
 			goto cleanup;
@@ -212,13 +214,13 @@ cleanup:
 		if (cl_data->sensor_virt_addr[i]) {
 			dma_free_coherent(&privdata->pdev->dev, 8 * sizeof(int),
 					  cl_data->sensor_virt_addr[i],
-					  cl_data->sensor_phys_addr[i]);
+					  cl_data->sensor_dma_addr[i]);
 		}
-		kfree(cl_data->feature_report[i]);
-		kfree(cl_data->input_report[i]);
-		kfree(cl_data->report_descr[i]);
+		devm_kfree(dev, cl_data->feature_report[i]);
+		devm_kfree(dev, cl_data->input_report[i]);
+		devm_kfree(dev, cl_data->report_descr[i]);
 	}
-	kfree(cl_data);
+	devm_kfree(dev, cl_data);
 	return rc;
 }
 
@@ -238,9 +240,8 @@ int amd_sfh_hid_client_deinit(struct amd_mp2_dev *privdata)
 		if (cl_data->sensor_virt_addr[i]) {
 			dma_free_coherent(&privdata->pdev->dev, 8 * sizeof(int),
 					  cl_data->sensor_virt_addr[i],
-					  cl_data->sensor_phys_addr[i]);
+					  cl_data->sensor_dma_addr[i]);
 		}
 	}
-	kfree(cl_data);
 	return 0;
 }
