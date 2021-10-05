@@ -175,6 +175,7 @@ EXPORT_SYMBOL(mdiobus_alloc_size);
 static void mdiobus_release(struct device *d)
 {
 	struct mii_bus *bus = to_mii_bus(d);
+
 	BUG_ON(bus->state != MDIOBUS_RELEASED &&
 	       /* for compatibility with error handling in drivers */
 	       bus->state != MDIOBUS_ALLOCATED);
@@ -458,8 +459,7 @@ static void of_mdiobus_link_mdiodev(struct mii_bus *bus,
 			continue;
 
 		if (addr == mdiodev->addr) {
-			dev->of_node = child;
-			dev->fwnode = of_fwnode_handle(child);
+			device_set_node(dev, of_fwnode_handle(child));
 			return;
 		}
 	}
@@ -525,6 +525,10 @@ int __mdiobus_register(struct mii_bus *bus, struct module *owner)
 	    NULL == bus->read || NULL == bus->write)
 		return -EINVAL;
 
+	if (bus->parent && bus->parent->of_node)
+		bus->parent->of_node->fwnode.flags |=
+					FWNODE_FLAG_NEEDS_CHILD_BOUND_ON_ADD;
+
 	BUG_ON(bus->state != MDIOBUS_ALLOCATED &&
 	       bus->state != MDIOBUS_UNREGISTERED);
 
@@ -537,6 +541,7 @@ int __mdiobus_register(struct mii_bus *bus, struct module *owner)
 	err = device_register(&bus->dev);
 	if (err) {
 		pr_err("mii_bus %s failed to register\n", bus->id);
+		put_device(&bus->dev);
 		return -EINVAL;
 	}
 
