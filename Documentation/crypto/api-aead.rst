@@ -21,3 +21,7 @@ Asynchronous AEAD Request Handle
 
 .. kernel-doc:: include/crypto/aead.h
    :functions: crypto_aead_reqsize aead_request_set_tfm aead_request_alloc aead_request_free aead_request_set_callback aead_request_set_crypt aead_request_set_ad
+
+
+--------------------------------------------------------------------------
+
